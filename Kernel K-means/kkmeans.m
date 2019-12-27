@@ -1,4 +1,4 @@
-function [means_new, objective] = kkmeans(image_num, cluster_num, rngseed, hyper)
+function [means_new, objective] = kkmeans(image_num, cluster_num, init_type, rngseed, hyper)
 %KKMEANS Perform kernel K-means
 %   Standard k-means, but we use our kernel for the distance metric between
 %   datapoints in kernel space
@@ -14,24 +14,12 @@ function [means_new, objective] = kkmeans(image_num, cluster_num, rngseed, hyper
     
     % Total number of data_points
     datapoints_num = size(image_mat, 1)*size(image_mat, 2);
-    % Matrix to store assignment of datapoints to clusters (1 if in cluster, 0 if not)
-    % clusters = zeros(cluster_num, datapoints_num);
-    cluster_distances = zeros(cluster_num, datapoints_num);
-    % Choose random datapoints as initial cluster centers
-    means_old = round(rand(cluster_num, 1)*datapoints_num+1);
-    means_new = means_old;
-    % Kernel hyperparameters
+    
+    %% Kernel hyperparameters
     gamma_s = hyper(1);
     gamma_c = hyper(2);
-    % Kluster colors 
-    cluster_colors = zeros(size(image_mat,3), cluster_num);
-    for k=1:cluster_num
-        cluster_colors(:, k) = color_vec(means_old(k), image_mat)/256;
-    end
-    clustered_image = zeros(size(image_mat));
-    clustered_image_gray = zeros(100, 100);
-    % Klustered GIF filename
-    filename = ['Kernel K-means/KKMeansImage',num2str(image_num), 'RNG', num2str(rngseed), 'Klusters', num2str(cluster_num),'.gif'];
+    
+    
     
 
     %% Compute the Gram matrix first, we'll use it's elements in the
@@ -40,18 +28,61 @@ function [means_new, objective] = kkmeans(image_num, cluster_num, rngseed, hyper
     [Gram, Coord, Color] = compute_Gram(image_mat, gamma_s, gamma_c);
     figure(1);
     imshow(Gram);
+
+    %% K-means initialization strategies
+    if init_type == 1
+        % Choose random datapoints as initial cluster centers
+        means_old = round(rand(cluster_num, 1)*datapoints_num+1);
+        init_type_str = ['RNG', num2str(rngseed)];
+    elseif init_type == 2
+        % k-means++
+        % Choose first point randomly, others as the weighted distribution
+        % based on Gram
+        means_old = zeros(cluster_num, 1);
+        means_old(1) = round(rand*datapoints_num+1);
+        means = [means_old(1)];
+        for i=2:cluster_num
+            
+                shortest_distance=min(2-Gram(means, :), [], 1);
+                [shortest_distance, ind] = sort(shortest_distance, 'descend');
+                shortest_distance = shortest_distance/sum(shortest_distance, 2);
+                threshold = rand;
+                for n=1:datapoints_num
+                    if (threshold>shortest_distance(n))
+                        means = [means, ind(n)];
+                        break;
+                    end
+                end
+                
+                
+        end
+        means_old = means';
+        init_type_str = 'Kms++';
+    end
+    means_new = means_old;
+
+    %% Kluster colors 
+    cluster_colors = zeros(size(image_mat,3), cluster_num);
+    for k=1:cluster_num
+        cluster_colors(:, k) = color_vec(means_old(k), image_mat)/256;
+    end
+    clustered_image = zeros(size(image_mat));
+    clustered_image_gray = zeros(100, 100);
+
+    %% Klustered GIF filename
+    file_path = 'Kernel K-means';
+    file_header = '/KKMeans';
+    image_num_str = ['Image',num2str(image_num)];
+    kluster_num_str = ['Klusters', num2str(cluster_num)];
+    
+    filename = [file_path, file_header, image_num_str, init_type_str, kluster_num_str,'.gif'];
     %% Start K-means
     for i=1:K_max
         disp(['--KKmeans iteration ', num2str(i), '--']);
+        % Matrix to store assignment of datapoints to clusters (1 if in cluster, 0 if not)
         clusters = zeros(cluster_num, datapoints_num);
         % E-step, assign points to clusters
         % Compute distances from datapoints to cluster means
-%         for n=1:datapoints_num
-%             
-%             for k=1:cluster_num
-%                 cluster_distances_slow(k, n) = exp(-gamma_s*norm(Coord(:, n)-Coord(:, means_old(k, 1)))^2)* exp(-gamma_c*norm(Color(:, n)-Color(:, means_old(k, 1)))^2);
-%             end
-%         end
         % Basically extract the approapriate rows of our Gram matrix
         cluster_distances = Gram(means_old, :);
         % Assignm minmum distance points to appropriate clusters, use
@@ -76,7 +107,7 @@ function [means_new, objective] = kkmeans(image_num, cluster_num, rngseed, hyper
         if i ==1 
             imwrite(imind,cm, filename, 'DelayTime', 1, 'Loopcount', inf);
         else
-            imwrite(imind,cm, filename, 'DelayTime',0.1, 'WriteMode', 'Append');
+            imwrite(imind,cm, filename, 'DelayTime',0.5, 'WriteMode', 'Append');
         end
         
         L = sqrt(diag(1./N_k));

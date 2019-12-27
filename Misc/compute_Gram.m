@@ -4,14 +4,13 @@ function [Gram, Coordinates, Color] = compute_Gram(image_mat, gamma_s, gamma_c)
     datapoints_num = size(image_mat, 1) * size(image_mat, 2);
     datapoints = 1:datapoints_num;
     Coordinates = spatial(datapoints, image_mat);
-    Color = double(reshape(image_mat, 3, datapoints_num));
-    
-%     Color_true = zeros(3, datapoints_num);
-%     for n=1:size(image_mat, 1)
-%         for m=1:size(image_mat, 2)
-%             Color_true(:, (n-1)*size(image_mat, 2)+m) = double(image_mat(m, m,:));
-%         end
-%     end
+
+    Color = zeros(3, datapoints_num);
+    for n=1:size(image_mat, 1)
+        for m=1:size(image_mat, 2)
+            Color(:, (n-1)*size(image_mat, 2)+m) = double(image_mat(m, n,:));
+        end
+    end
 %     Coordinates([1, 2], :) = Coordinates([2, 1], :);
     %Pdist form
     % Space
