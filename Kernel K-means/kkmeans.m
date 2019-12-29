@@ -16,8 +16,7 @@ function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, ini
         means_old = round(rand(cluster_num, 1)*datapoints_num+1);
         init_type_str = ['RNG', num2str(rngseed)];
     elseif init_type == 2
-        % k-means++
-        % Choose first point randomly, others as the weighted distribution
+        % k-means++: Choose first point randomly, others as the weighted distribution
         % based on Gram
         means_old = zeros(cluster_num, 1);
         means_old(1) = round(rand*datapoints_num+1);
@@ -57,7 +56,8 @@ function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, ini
     %% Start K-means
     for i=1:K_max
         disp(['--KKmeans iteration ', num2str(i), '--']);
-        % Matrix to store assignment of datapoints to clusters (1 if in cluster, 0 if not)
+        % Matrix to store assignment of datapoints to clusters 
+        % (1 if in cluster, 0 if not)
         clusters = zeros(cluster_num, datapoints_num);
         % E-step, assign points to clusters
         % Compute distances from datapoints to cluster means
@@ -72,36 +72,36 @@ function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, ini
         for n=1:datapoints_num
             [~, k] = max(clusters(:,n), [], 1);
             [x, y] =ind2sub([100, 100], n);
+            % Each datapoint get's it's cluster mean color
             clustered_image(x, y, :) = cluster_colors(:,k);
             clustered_image_gray(x, y) = sum(cluster_colors(:,k))/3;
         end
-
+        % Show cluster assignment at runtime
         figure(4);
         imshow(clustered_image);
         figure(3);
         imshow(clustered_image_gray);
-
+        % Write current image frame to a GIF file
         [imind,cm] = rgb2ind(clustered_image, 255);
         if i ==1 
             imwrite(imind,cm, filename, 'DelayTime', 1, 'Loopcount', inf);
         else
             imwrite(imind,cm, filename, 'DelayTime',0.5, 'WriteMode', 'Append');
         end
-        
+        % Objective function to see how good our cluster assignment is,
+        % depends on the hyperparameters
         L = sqrt(diag(1./N_k));
-        % M-step, find new means  
-        
         objective = [objective, trace(L*clusters*Gram*clusters'*L)];
+        % M-step, find new means  
         for k=1:cluster_num
             % For each datapoint in a cluster, find a point, that minimizes
             % the overall distance to every other point in a cluster, that
             % will be our new mean
-            % We 
             data_distances = zeros(datapoints_num, 1);
             for n=1:datapoints_num
                 if clusters(k, n)
                     % Compute distances from datapoint n to all
-                    % other datapoints m in cluster k
+                    % other datapoints in cluster k
                     data_distances(n, 1) = Gram(n, :)*clusters(k, :)';
                 end
             end

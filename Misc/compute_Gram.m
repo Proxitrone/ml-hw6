@@ -1,6 +1,6 @@
 function [Gram, Coordinates, Color] = compute_Gram(image_mat, gamma_s, gamma_c)
-%COMPUTE_GRAM Summary of this function goes here
-%   Detailed explanation goes here
+%COMPUTE_GRAM Compute pairwise distances between our datapoints
+%   We use 2 RBF kernels multiplied together as the distance measure
     datapoints_num = size(image_mat, 1) * size(image_mat, 2);
     datapoints = 1:datapoints_num;
     Coordinates = spatial(datapoints, image_mat);
