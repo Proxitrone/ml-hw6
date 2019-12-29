@@ -32,15 +32,15 @@ cut_type = [1, 2];
     D_sqrt= diag(1./sqrt(sum(Gram, 1)));
     L_norm = D_sqrt*L_ratio*D_sqrt;
     %% Get the eigenvalues and vectors of our graph Laplacian (Ratio)
-%     [eigVec_ratio, eigVal] = eig(L_ratio); 
-%     [d, ind] = sort(diag(eigVal));
-%     eigVal = eigVal(:, ind);
-%     eigVec_ratio = eigVec_ratio(:, ind);
-%     figure(2);
-%     scatter(1:numel(d), d);
-%     title('Eigenvalues of Graph Laplacian (Ratio)');
-%     ylabel('eigenvalue');
-%     xlabel('soreted order');
+    [eigVec_ratio, eigVal] = eig(L_ratio); 
+    [d, ind] = sort(diag(eigVal));
+    eigVal = eigVal(:, ind);
+    eigVec_ratio = eigVec_ratio(:, ind);
+    figure(2);
+    scatter(1:numel(d), d);
+    title('Eigenvalues of Graph Laplacian (Ratio)');
+    ylabel('eigenvalue');
+    xlabel('soreted order');
 
     %% Get the eigenvalues and vectors of our graph Laplacian (Normal)
     [eigVec_norm, eigVal] = eig(L_norm); 
@@ -48,7 +48,7 @@ cut_type = [1, 2];
     eigVal = real(eigVal(:, ind));
     eigVec_norm = real(eigVec_norm(:, ind));
     % Normalize the rows with norm 1
-%     eigVec_norm = eigVec_norm./sqrt(sum(eigVec_norm.^2, 2));
+    eigVec_norm = eigVec_norm./sqrt(sum(eigVec_norm.^2, 2));
     figure(5);
     scatter(1:numel(d), real(d));
     title('Eigenvalues of Graph Laplacian (Norma)');
@@ -57,12 +57,11 @@ cut_type = [1, 2];
 
     %% Start simulations
     for j=1:length(init_type)
-        
-        for c=3:length(cluster_num)
+        for c=1:length(cluster_num)
             %% KKmeans
-%             [centroids_KK, objective_KK] = kkmeans(images(i), image_mat, cluster_num(c), init_type(j), rng_seed, Gram);
+            [centroids_KK, objective_KK] = kkmeans(images(i), image_mat, cluster_num(c), init_type(j), rng_seed, Gram);
             %% Spectral Clustering RatioCut
-%             [centroids_SC, objective_DC] = spectral(images(i), image_mat, cluster_num(c), init_type(j), rng_seed, Gram, eigVec_ratio, 1);
+            [centroids_SC, objective_DC] = spectral(images(i), image_mat, cluster_num(c), init_type(j), rng_seed, Gram, eigVec_ratio, 1);
             %% Spectral Clustering NormalCut
             [centroids_SC, objective_DC] = spectral(images(i), image_mat, cluster_num(c), init_type(j), rng_seed, Gram, eigVec_norm, 2);
         end
