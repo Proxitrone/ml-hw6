@@ -1,7 +1,7 @@
-function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, init_type, rngseed, Gram)
-%KKMEANS Perform kernel K-means
-%   Standard k-means, but we use our kernel for the distance metric between
-%   datapoints in kernel space
+function [means_new, objective] = spectral(image_num, image_mat, cluster_num, init_type, rngseed, Gram, eigVec, cut)
+%spectral Perform spectral clustering
+%   Build a similarity graph (Gram matrix), graph Laplacian, llok at it's
+%   eigenvalues and eigenvectors
     rng(rngseed);
     %% Initialize 
     K_max = 100;
@@ -9,7 +9,9 @@ function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, ini
     
     % Total number of data_points
     datapoints_num = size(image_mat, 1)*size(image_mat, 2);
-    
+
+    %% Extract first cluster_num eigenvectors
+    data_vectors = eigVec(:, 1:cluster_num);
     %% K-means initialization strategies
     if init_type == 1
         % Choose random datapoints as initial cluster centers
@@ -24,6 +26,7 @@ function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, ini
         means = [means_old(1)];
         for i=2:cluster_num
                 shortest_distance=min(2-Gram(means, :), [], 1);
+%                 shortest_distance = min(pdist2(data_vectors,data_vectors(means, :),'euclidean'), [], 1);
                 [shortest_distance, ind] = sort(shortest_distance, 'descend');
                 shortest_distance = shortest_distance/sum(shortest_distance, 2);
                 threshold = rand;
@@ -38,6 +41,7 @@ function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, ini
         init_type_str = 'Kms++';
     end
     means_new = means_old;
+    old_norm = 1;
 
     %% Kluster colors 
     cluster_colors = zeros(size(image_mat,3), cluster_num);
@@ -48,29 +52,37 @@ function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, ini
     clustered_image_gray = zeros(100, 100);
 
     %% Klustered GIF filename
-    file_path = 'Kernel K-means';
-    file_header = '/KKMeans';
+    file_path = 'Spectral Clustering';
+    file_header = '/Spectral';
     image_num_str = ['Image',num2str(image_num)];
     kluster_num_str = ['Klusters', num2str(cluster_num)];
+    if cut==1
+        cut_type_str = ['RatioCut'];
+    elseif cut==2
+        cut_type_str = ['NormaCut'];
+    end
     
-    filename = [file_path, file_header, image_num_str, init_type_str, kluster_num_str,'.gif'];
-    %% Start K-means
+    
+    filename = [file_path, file_header, image_num_str, init_type_str, kluster_num_str, cut_type_str, '.gif'];
+    
+    %% Perform K-means on the first cluster_num eigenvectors
+
     for i=1:K_max
-        disp(['--KKmeans iteration ', num2str(i), '--']);
+        disp(['--Spectral Kmeans iteration ', num2str(i), '--']);
         % Matrix to store assignment of datapoints to clusters (1 if in cluster, 0 if not)
         clusters = zeros(cluster_num, datapoints_num);
+        
         % E-step, assign points to clusters
         % Compute distances from datapoints to cluster means
-        % Basically extract the approapriate rows of our Gram matrix
-        cluster_distances = Gram(means_old, :);
-        % Assignm minmum distance points to appropriate clusters, use
-        % linear indexing
-        [~, index] = max(cluster_distances, [], 1, 'linear');
+
+        cluster_distances = pdist2(data_vectors, data_vectors(means_old, :), 'euclidean')';
+
+        [~, index] = min(cluster_distances, [], 1, 'linear');
         clusters(index) = 1;
         N_k = sum(clusters==1, 2);
         % Visualize klusters
         for n=1:datapoints_num
-            [~, k] = max(clusters(:,n), [], 1);
+            [~, k] = max(clusters(:, n), [], 1);
             [x, y] =ind2sub([100, 100], n);
             clustered_image(x, y, :) = cluster_colors(:,k);
             clustered_image_gray(x, y) = sum(cluster_colors(:,k))/3;
@@ -87,25 +99,26 @@ function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, ini
         else
             imwrite(imind,cm, filename, 'DelayTime',0.5, 'WriteMode', 'Append');
         end
-        
-        L = sqrt(diag(1./N_k));
+
+        L_sqrt = sqrt(diag(1./N_k));
         % M-step, find new means  
         
-        objective = [objective, trace(L*clusters*Gram*clusters'*L)];
+        objective = [objective, trace(L_sqrt*clusters*Gram*clusters'*L_sqrt)];
+
         for k=1:cluster_num
             % For each datapoint in a cluster, find a point, that minimizes
             % the overall distance to every other point in a cluster, that
             % will be our new mean
             % We 
-            data_distances = zeros(datapoints_num, 1);
+            data_distances = ones(datapoints_num, 1)*1000;
             for n=1:datapoints_num
                 if clusters(k, n)
                     % Compute distances from datapoint n to all
                     % other datapoints m in cluster k
-                    data_distances(n, 1) = Gram(n, :)*clusters(k, :)';
+                    data_distances(n, 1) = pdist2(data_vectors,data_vectors(n,:), 'euclidean')'*clusters(k, :)';
                 end
             end
-            [~, index] = max(data_distances);
+            [~, index] = min(data_distances);
             means_new(k, 1) = index;
         end
         for k=1:cluster_num
@@ -113,12 +126,23 @@ function [means_new, objective] = kkmeans(image_num, image_mat, cluster_num, ini
         end
         % Termination condition: Our cluster centers don't change from last
         % iteration
-        if (sum(means_old - means_new ==0) == cluster_num )
+%         new_norm = norm(means_old - means_new)^2;
+        if (sum(means_old - means_new ==0)==cluster_num)
             disp(['Number of iterations spend for KKmeans is ', num2str(i)]);
             break;
         end
         means_old = means_new;
+%         old_norm = new_norm;
     end
 
+    %% Plot the eigenspace coordinates of points in same clusters
+    % Basically plot the eigenvectors for each cluster
+    for k=1:cluster_num
+        figure(5+k);
+        scatter(1:datapoints_num, data_vectors(:, k));
+        title(['Eigenvec ', num2str(k)]);
+        xlabel('data point');
+        ylabel('eigen vec coord');
+    end 
 end
 
